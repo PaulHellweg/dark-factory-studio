@@ -37,6 +37,24 @@ claude
 
 Claude will interview you about your project, then guide you through all 5 phases.
 
+## Web UI
+
+Dark Factory Studio includes a local browser dashboard that runs alongside your Claude Code terminal session.
+
+```bash
+node ui/server.mjs
+# Open http://localhost:3333
+```
+
+The UI provides:
+- **Live pipeline status** — see all 5 phases at a glance, auto-updates when files change
+- **Phase 01 input form** — structured project intake (vision, actors, constraints) saved to `studio/prompt-input.md`
+- **Artifact viewer** — read spec.md, architecture.md, schema.prisma, project-context.md directly in the browser
+- **Approve / Feedback buttons** — approve phases or send revision feedback without touching the terminal
+- **Activity log** — live progress tracking
+
+The UI watches `studio/` for file changes via SSE and refreshes automatically. No build step, no dependencies — just `node ui/server.mjs`.
+
 ## The 5 Phases
 
 ### Phase 01 — Prompt & PRD
