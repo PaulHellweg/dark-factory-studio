@@ -1,167 +1,137 @@
-# Dark Factory Studio — v7
+# Dark Factory Studio
 
-> Prompt rein → Approved Design → Approved Schema → Approved Stack → Produkt raus.
-> Human bleibt in der Kontrolle. Jede Phase hat einen Approval Gate.
-> Alle Sicherheitsregeln sind deterministisch in Hooks — nicht in CLAUDE.md als Bitten.
+A structured 5-phase pipeline for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that turns a freeform project idea into a production-ready app — with human approval at every step.
 
----
+```
+Your idea → PRD → UI Prototype → Schema → Stack Decision → Working App
+```
 
-## Upgrade-Quelle: Community Research
+## Why
 
-Dieses Setup integriert Best-Practices aus:
-- **obra/superpowers** (26k ★) — systematic-debugging, verification-before-completion, TDD-Methodik
-- **affaan-m/everything-claude-code** (35k ★) — Hook-Event-Vollständigkeit, rules/ Konzept, context modes
-- **disler/claude-code-hooks-mastery** — SessionStart/PreCompact Pattern, JSON hook responses
-- **BehiSecc/vibesec + Trail of Bits** — OWASP Top 10 skill, secret-scanner hook
-- **ChrisWiles/claude-code-showcase** — Branch-protection hooks, skill-evaluation patterns
+AI makes building fast, but it also makes building the **wrong thing** fast.
+Dark Factory Studio forces the right order: understand first, design second, build last.
+Every phase ends with a human checkpoint — you approve before the next phase begins.
 
----
+Safety rules (no premature code, no secrets in source, no destructive commands) are enforced by **deterministic hooks**, not by asking the AI nicely.
 
-## Kernprinzip: Deterministisch vs. Probabilistisch
+## Requirements
 
-| Mechanismus | Verhalten | Einsatz |
-|---|---|---|
-| Hooks | 100% deterministisch — laufen immer | Sicherheitsregeln, Gate-Enforcement |
-| Skills | Probabilistisch — Claude entscheidet | Workflows, Domain-Knowledge |
-| CLAUDE.md | Immer geladen, aber "suggestions" | Kontext, Routing, Non-Negotiables |
-| Agents | Isolierter Context | Spezialisierte Tasks |
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
+- Node.js 18+
 
-→ Alles was "immer passieren muss" gehört in Hooks. Nie in CLAUDE.md.
-
----
-
-## Setup
+## Quick Start
 
 ```bash
-cp -r dark-factory-studio/.claude  ./
-cp dark-factory-studio/CLAUDE.md   ./
+# Clone into your new project
+git clone https://github.com/PaulHellweg/dark-factory-studio.git
+cp -r dark-factory-studio/.claude ./
+cp dark-factory-studio/CLAUDE.md ./
 mkdir -p studio
+
+# Start Claude Code
 claude
+
+# Begin the pipeline
 /df:start
 ```
 
----
+Claude will interview you about your project, then guide you through all 5 phases.
 
-## Vollständige Dateistruktur
+## The 5 Phases
+
+### Phase 01 — Prompt & PRD
+Claude interviews you: What does the app do? Who uses it? What are the constraints?
+Outputs `studio/spec.md`. You review and approve.
+
+### Phase 02 — Design Review
+Derives page structure and component hierarchy from your spec.
+Builds a working UI prototype (Next.js + Tailwind, mock data only).
+Outputs `studio/architecture.md` + `prototype/`. You review and approve.
+
+### Phase 03 — Data Model
+Generates a complete Prisma schema from your spec and architecture.
+Outputs `studio/schema.prisma`. You review and approve.
+
+### Phase 04 — Stack Decision
+Proposes a tech stack layer by layer, each choice tied to your constraints.
+Presents tradeoffs and alternatives. You pick, swap, or approve.
+Outputs `studio/project-context.md` (sealed). You review and approve.
+
+### Phase 05 — Build
+The actual app gets built in `app/` using TDD, following your approved spec, schema, and stack. Security audit runs before completion.
+
+## Commands
+
+| Command | What it does |
+|---------|-------------|
+| `/df:start` | Start a new project, begin Phase 01 |
+| `/df:approve` | Approve current phase, unlock the next |
+| `/df:status` | Show pipeline progress |
+| `/df:resume` | Restore context after a new session or context reset |
+
+## How Approvals Work
+
+After each phase, Claude presents the output and **stops**. You can:
+- **Approve** with `/df:approve` — next phase unlocks
+- **Give feedback** — Claude revises, presents again, still waits for approval
+- You cannot skip phases. Code cannot be written before the stack is decided.
+
+## What the Hooks Enforce
+
+These rules run as deterministic hooks — they **always** fire, regardless of prompt.
+
+| Rule | What happens |
+|------|-------------|
+| No code before Phase 04 | Writing to `app/` or `src/` is blocked until stack is sealed |
+| No secrets in code | API keys, passwords, private keys in source files are blocked |
+| No destructive commands | `rm -rf`, `DROP TABLE`, force push without lease are blocked |
+| No skipping gates | Session cannot end while a phase is awaiting approval |
+| Context backup | All planning files are backed up before context compaction |
+| Progress tracking | Every file write is logged to `studio/progress.md` |
+| Plan re-reading | Claude is reminded to re-read the task plan every 2 write operations |
+
+## Model Routing
+
+Different phases use different Claude models based on task complexity:
+
+| Model | Used for | Why |
+|-------|---------|-----|
+| Sonnet | PRD, UI design, schema generation | Well-defined tasks, fast execution |
+| Opus | Stack decisions, security audit, architecture review | Tradeoff analysis, high-stakes judgment |
+| Haiku | DevOps, docs, dependency checks | Simple tasks, cost-efficient |
+
+## Project Structure (After Full Pipeline)
 
 ```
-project/
-├── CLAUDE.md                          ← root, ~600 tokens
-├── studio/                            ← alle Phase-Artefakte
-│   ├── spec.md                        ← Phase 01
-│   ├── architecture.md                ← Phase 02
-│   ├── schema.prisma                  ← Phase 03
-│   ├── project-context.md             ← Phase 04 (SEALED)
-│   ├── task_plan.md                   ← Manus planning
-│   ├── findings.md                    ← Decisions
-│   ├── progress.md                    ← Session log (Hook-geschrieben)
-│   └── .backups/                      ← PreCompact Backups
-├── prototype/                         ← Phase 02 (mock data, kein Backend)
+your-project/
+├── CLAUDE.md                  ← Pipeline config (always loaded)
+├── studio/                    ← Phase artifacts
+│   ├── spec.md                ← Your approved PRD
+│   ├── architecture.md        ← Approved page/component structure
+│   ├── schema.prisma          ← Approved data model
+│   ├── project-context.md     ← Sealed stack decision
+│   ├── task_plan.md           ← Current progress
+│   ├── findings.md            ← Decisions and discoveries
+│   └── progress.md            ← Auto-generated session log
+├── prototype/                 ← Throwaway UI prototype (mock data)
+├── app/                       ← The real app (built in Phase 05)
 └── .claude/
-    ├── settings.json                  ← 8 Hook-Events konfiguriert
-    ├── rules/
-    │   ├── no-premature-code.md
-    │   ├── approval-gate.md
-    │   └── tdd-enforced.md
-    ├── agents/
-    │   ├── prd-agent.md               ← sonnet · Phase 01
-    │   ├── ui-designer.md             ← sonnet · Phase 02
-    │   ├── schema-agent.md            ← sonnet · Phase 03
-    │   └── stack-advisor.md           ← opus  · Phase 04
-    ├── skills/
-    │   ├── prd-interviewer/           ← Phase 01 · SKILL.md + PHASE.md
-    │   ├── architecture-layout/       ← Phase 02 · SKILL.md + PHASE.md
-    │   ├── frontend-prototype/        ← Phase 02 · SKILL.md
-    │   ├── schema-generator/          ← Phase 03 · SKILL.md + PHASE.md
-    │   ├── detect-stack/              ← Phase 04 · SKILL.md
-    │   ├── build-phase/               ← Phase 05 · PHASE.md
-    │   ├── systematic-debugging/      ← Build · obra/superpowers pattern
-    │   ├── verification-before-completion/ ← Build · obra/superpowers
-    │   └── security-hardening/        ← Build · OWASP Top 10 + vibesec
-    ├── hooks/
-    │   ├── session-start.mjs          ← SessionStart: context restore
-    │   ├── pre-compact.mjs            ← PreCompact: backup planning files
-    │   ├── secret-scanner.mjs         ← PreToolUse Write: block hardcoded secrets
-    │   ├── gate-phase.mjs             ← PreToolUse Write: enforce phase ordering
-    │   ├── block-dangerous.mjs        ← PreToolUse Bash: rm -rf, DROP, migrate
-    │   ├── reread-plan.mjs            ← PreToolUse Write: Manus 2-op rule
-    │   ├── update-progress.mjs        ← PostToolUse Write: progress.md log
-    │   └── verify-completion.mjs      ← Stop: block if gate open
-    └── commands/
-        ├── df-start.md                ← /df:start
-        ├── df-approve.md              ← /df:approve
-        ├── df-status.md               ← /df:status
-        └── df-resume.md               ← /df:resume
+    ├── settings.json          ← Hook configuration
+    ├── hooks/                 ← 8 deterministic enforcement hooks
+    ├── agents/                ← 4 phase-specific agents
+    ├── skills/                ← 9 workflow skills
+    ├── rules/                 ← 3 rule documents
+    └── commands/              ← 4 slash commands
 ```
 
----
+## Credits
 
-## Hook-Events Übersicht
+Built on patterns from:
+- [obra/superpowers](https://github.com/obra/superpowers) — systematic debugging, verification-before-completion
+- [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) — hook patterns, rules concept
+- [disler/claude-code-hooks-mastery](https://github.com/disler/claude-code-hooks-mastery) — SessionStart/PreCompact patterns
+- [BehiSecc/vibesec](https://github.com/BehiSecc/awesome-claude-skills) — OWASP Top 10 skill, secret scanning
 
-| Hook | Event | Blockiert? | Was |
-|---|---|---|---|
-| `session-start` | SessionStart | Nein | Zeigt Pipeline-State + Git-Context beim Start |
-| `pre-compact` | PreCompact | Nein | Backupt alle studio/*.md vor Compaction |
-| `secret-scanner` | PreToolUse Write | **Ja** | Blockiert API-Keys, Passwörter in Code |
-| `gate-phase` | PreToolUse Write | **Ja** | Blockiert Code vor Phase 04, Schema vor Phase 02 |
-| `block-dangerous` | PreToolUse Bash | **Ja** | Blockiert rm -rf, DROP TABLE, migrate ohne SEALED |
-| `reread-plan` | PreToolUse Write | Nein | Erinnert an task_plan alle 2 Ops |
-| `update-progress` | PostToolUse Write | Nein | Schreibt in progress.md |
-| `verify-completion` | Stop | **Ja** | Blockiert Session-Ende wenn Gate offen |
+## License
 
----
-
-## Skills Übersicht
-
-| Skill | Phase | Auto-trigger |
-|---|---|---|
-| `prd-interviewer` | 01 | "let's start", "new project", /df:start |
-| `architecture-layout` | 02 | nach Phase 01 approval |
-| `frontend-prototype` | 02 | nach architecture-layout |
-| `schema-generator` | 03 | nach Phase 02 approval |
-| `detect-stack` | 04 | nach Phase 03 approval |
-| `build-phase` | 05 | nach Phase 04 SEAL |
-| `systematic-debugging` | 05 | "bug", "not working", "error", "fails" |
-| `verification-before-completion` | 05 | "done", "finished", "complete", "fixed" |
-| `security-hardening` | 05 | auth, payments, file upload, user input code |
-
----
-
-## Agents & Routing
-
-| Agent | Modell | Phase | Warum opus/sonnet |
-|---|---|---|---|
-| prd-agent | sonnet | 01 | Klar-definierter Task, kein Strategic Reasoning |
-| ui-designer | sonnet | 02 | Code-Gen + Struktur, kein Tradeoff-Judgment |
-| schema-agent | sonnet | 03 | Ableitung aus Spec, keine Architektur-Entscheidungen |
-| stack-advisor | **opus** | 04 | Tradeoff-Analyse — diese Entscheidung hat downstream-Kosten |
-| security-auditor | **opus** | 05 | VETO-Berechtigung braucht bestes Reasoning |
-| architect-reviewer | **opus** | 05 | Finales Architektur-Urteil |
-| devops-engineer | haiku | 05 | Docker/CI — günstig, klar definiert |
-
----
-
-## Integration mit Dark Factory v6
-
-Phase 05 nutzt den DF v6 Build-Loop.
-
-Mapping:
-- `studio/spec.md` → ersetzt `requirements.md`
-- `studio/project-context.md` → ersetzt manuelle Stack-Konfiguration
-- `prototype/` → UI-Referenz für alle Build-Agents
-
-DF v6 Skills die in Phase 05 geladen werden:
-`write-plan`, `execute-plan`, `tdd`, `code-review`, `security-audit`, `finish-branch`
-
----
-
-## Quellen & Credits
-
-```
-obra/superpowers          github.com/obra/superpowers
-affaan-m/everything-cc    github.com/affaan-m/everything-claude-code
-disler/hooks-mastery      github.com/disler/claude-code-hooks-mastery
-BehiSecc/vibesec          github.com/BehiSecc/awesome-claude-skills
-hesreallyhim/awesome-cc   github.com/hesreallyhim/awesome-claude-code
-Anthropic Skills Docs     code.claude.com/docs/en/skills
-```
+MIT
