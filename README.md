@@ -1,154 +1,188 @@
-# Dark Factory Studio
+# Dark Factory Studio v6.1
 
-A structured 5-phase pipeline for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that turns a freeform project idea into a production-ready app — with human approval at every step.
+Autonomous SWE lifecycle pipeline for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Spec goes in, deployed software comes out.
 
 ```
-Your idea → PRD → UI Prototype → Schema → Stack Decision → Working App
+Spec → Architecture → Plan → Implement → Test → Review → Security → Deploy
 ```
 
-## Why
+## What's New in v6.1
 
-AI makes building fast, but it also makes building the **wrong thing** fast.
-Dark Factory Studio forces the right order: understand first, design second, build last.
-Every phase ends with a human checkpoint — you approve before the next phase begins.
+### Self-Improvement Loop
+After any correction, Claude writes a structured lesson to `tasks/lessons.md`. Every session starts by reading this file. Mistake rates drop over the lifetime of a project.
 
-Safety rules (no premature code, no secrets in source, no destructive commands) are enforced by **deterministic hooks**, not by asking the AI nicely.
+### Elegance Hook
+A PostToolUse hook fires every 5 code writes and prompts:
+> *"Knowing everything I know now, implement the elegant solution."*
+
+Also available manually via `/df:elegance`.
+
+### No Checkpoints
+The pipeline runs start-to-finish autonomously. Only halts on:
+- Security VETO from `security-auditor`
+- Missing requirements
+- Unresolvable technical blocker
 
 ## Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
 - Node.js 18+
+- Python 3 (for hooks)
 
 ## Quick Start
 
+### New Project
 ```bash
-# Clone into your new project
 git clone https://github.com/PaulHellweg/dark-factory-studio.git
-cp -r dark-factory-studio/.claude ./
-cp dark-factory-studio/CLAUDE.md ./
-mkdir -p studio
+
+# Copy DF into your project
+cp -r dark-factory-studio/.claude /your-project/.claude
+cp dark-factory-studio/CLAUDE.md /your-project/CLAUDE.md
+mkdir -p /your-project/tasks
 
 # Start Claude Code
+cd /your-project
 claude
-
-# Begin the pipeline
 /df:start
 ```
 
-Claude will interview you about your project, then guide you through all 5 phases.
+### Existing Project
+```bash
+cp -r dark-factory-studio/.claude /your-existing-project/.claude
+cp dark-factory-studio/CLAUDE.md /your-existing-project/CLAUDE.md
+# Fill in project-context.md with your stack, then:
+/df:resume
+```
 
 ## Web UI
 
-Dark Factory Studio includes a local browser dashboard that runs alongside your Claude Code terminal session.
+Local browser dashboard alongside your Claude Code terminal session.
 
 ```bash
 node ui/server.mjs
 # Open http://localhost:3333
 ```
 
-The UI provides:
-- **Live pipeline status** — see all 5 phases at a glance, auto-updates when files change
-- **Phase 01 input form** — structured project intake (vision, actors, constraints) saved to `studio/prompt-input.md`
-- **Artifact viewer** — read spec.md, architecture.md, schema.prisma, project-context.md directly in the browser
-- **Approve / Feedback buttons** — approve phases or send revision feedback without touching the terminal
-- **Activity log** — live progress tracking
-
-The UI watches `studio/` for file changes via SSE and refreshes automatically. No build step, no dependencies — just `node ui/server.mjs`.
-
-## The 5 Phases
-
-### Phase 01 — Prompt & PRD
-Claude interviews you: What does the app do? Who uses it? What are the constraints?
-Outputs `studio/spec.md`. You review and approve.
-
-### Phase 02 — Design Review
-Derives page structure and component hierarchy from your spec.
-Builds a working UI prototype (Next.js + Tailwind, mock data only).
-Outputs `studio/architecture.md` + `prototype/`. You review and approve.
-
-### Phase 03 — Data Model
-Generates a complete Prisma schema from your spec and architecture.
-Outputs `studio/schema.prisma`. You review and approve.
-
-### Phase 04 — Stack Decision
-Proposes a tech stack layer by layer, each choice tied to your constraints.
-Presents tradeoffs and alternatives. You pick, swap, or approve.
-Outputs `studio/project-context.md` (sealed). You review and approve.
-
-### Phase 05 — Build
-The actual app gets built in `app/` using TDD, following your approved spec, schema, and stack. Security audit runs before completion.
+- **Live pipeline status** — all phases at a glance, auto-updates via SSE
+- **Artifact viewer** — read spec, architecture, schema, project-context in browser
+- **Approve / Feedback** — approve phases or send revisions without touching the terminal
 
 ## Commands
 
-| Command | What it does |
-|---------|-------------|
-| `/df:start` | Start a new project, begin Phase 01 |
-| `/df:approve` | Approve current phase, unlock the next |
-| `/df:status` | Show pipeline progress |
-| `/df:resume` | Restore context after a new session or context reset |
+| Command | Action |
+|---------|--------|
+| `/df:start` | Start pipeline from requirements |
+| `/df:approve` | Approve current phase, unlock next |
+| `/df:status` | Current phase + open tasks |
+| `/df:resume` | Resume after context reset |
+| `/df:elegance` | Manual elegance review on current code |
+| `/df:lessons` | Show lessons learned for this project |
 
-## How Approvals Work
+## Pipeline Phases
 
-After each phase, Claude presents the output and **stops**. You can:
-- **Approve** with `/df:approve` — next phase unlocks
-- **Give feedback** — Claude revises, presents again, still waits for approval
-- You cannot skip phases. Code cannot be written before the stack is decided.
+| Phase | Output | Gate |
+|-------|--------|------|
+| Spec | `SPEC.md` | Human review |
+| Architecture | `ARCHITECTURE.md` | Human review |
+| Plan | `tasks/task_plan.md` | Auto |
+| Implement | Source code (TDD) | Tests pass |
+| Review | `ARCHITECTURE_REVIEW.md` | Architect reviewer (opus) |
+| Security | `SECURITY_REPORT.md` | Security auditor (opus) — VETO power |
+| Deploy | Production | Health check |
 
-## What the Hooks Enforce
+## Agents & Model Routing
 
-These rules run as deterministic hooks — they **always** fire, regardless of prompt.
+| Agent | Model | Role |
+|-------|-------|------|
+| `security-auditor` | opus | Security audit, VETO power |
+| `architect-reviewer` | opus | Quality + elegance review |
+| `nextjs-agent` | sonnet | Next.js App Router |
+| `vue-agent` | sonnet | Vue 3 + Nuxt |
+| `svelte-agent` | sonnet | SvelteKit |
+| `typescript-node-agent` | sonnet | Hono/Express API |
+| `fastapi-agent` | sonnet | Python FastAPI |
+| `rust-agent` | sonnet | Axum + SQLx |
+| `go-agent` | sonnet | Chi/Gin |
+| `django-agent` | sonnet | Django + DRF |
+| `spring-boot-agent` | sonnet | Spring Boot 3 |
+| `cli-agent` | sonnet | CLI tools |
+| `react-native-agent` | sonnet | Expo mobile |
+| `devops-agent` | haiku | Docker + CI/CD |
 
-| Rule | What happens |
-|------|-------------|
-| No code before Phase 04 | Writing to `app/` or `src/` is blocked until stack is sealed |
-| No secrets in code | API keys, passwords, private keys in source files are blocked |
-| No destructive commands | `rm -rf`, `DROP TABLE`, force push without lease are blocked |
-| No skipping gates | Session cannot end while a phase is awaiting approval |
-| Context backup | All planning files are backed up before context compaction |
-| Progress tracking | Every file write is logged to `studio/progress.md` |
-| Plan re-reading | Claude is reminded to re-read the task plan every 2 write operations |
+## Hooks
 
-## Model Routing
+| Hook | Trigger | What |
+|------|---------|------|
+| `pre_tool_use.py` | PreToolUse Bash | Blocks rm -rf, DROP DB, force push, secrets, eval |
+| `post_tool_use.py` | PostToolUse Write | Progress reminders (every 2 writes), elegance trigger (every 5 writes) |
+| `secret-scanner.mjs` | PreToolUse Write | Blocks API keys, passwords, private keys in source |
+| `gate-phase.mjs` | PreToolUse Write | Enforces phase ordering |
+| `block-dangerous.mjs` | PreToolUse Bash | Blocks destructive DB operations |
+| `session-start.mjs` | SessionStart | Shows pipeline state on start |
+| `pre-compact.mjs` | PreCompact | Backs up planning files before compaction |
+| `verify-completion.mjs` | Stop | Blocks session end if approval gate open |
 
-Different phases use different Claude models based on task complexity:
+## The Self-Improvement Loop
 
-| Model | Used for | Why |
-|-------|---------|-----|
-| Sonnet | PRD, UI design, schema generation | Well-defined tasks, fast execution |
-| Opus | Stack decisions, security audit, architecture review | Tradeoff analysis, high-stakes judgment |
-| Haiku | DevOps, docs, dependency checks | Simple tasks, cost-efficient |
+```
+User correction or failed test
+        ↓
+Stop. Identify root cause.
+        ↓
+Append to tasks/lessons.md:
+  - Mistake (specific)
+  - Root Cause (why)
+  - Rule (concrete prevention)
+  - Pattern (what to watch for)
+        ↓
+Apply rule immediately
+        ↓
+Next session: read lessons.md first
+        ↓
+Mistake rate drops over time
+```
 
-## Project Structure (After Full Pipeline)
+## File Structure
 
 ```
 your-project/
-├── CLAUDE.md                  ← Pipeline config (always loaded)
-├── studio/                    ← Phase artifacts
-│   ├── spec.md                ← Your approved PRD
-│   ├── architecture.md        ← Approved page/component structure
-│   ├── schema.prisma          ← Approved data model
-│   ├── project-context.md     ← Sealed stack decision
-│   ├── task_plan.md           ← Current progress
-│   ├── findings.md            ← Decisions and discoveries
-│   └── progress.md            ← Auto-generated session log
-├── prototype/                 ← Throwaway UI prototype (mock data)
-├── app/                       ← The real app (built in Phase 05)
+├── CLAUDE.md                      ← Pipeline constitution
+├── tasks/
+│   ├── lessons.md                 ← Self-improvement log
+│   ├── task_plan.md               ← Current tasks
+│   ├── progress.md                ← Completion log
+│   └── findings.md                ← Research + decisions
 └── .claude/
-    ├── settings.json          ← Hook configuration
-    ├── hooks/                 ← 8 deterministic enforcement hooks
-    ├── agents/                ← 4 phase-specific agents
-    ├── skills/                ← 9 workflow skills
-    ├── rules/                 ← 3 rule documents
-    └── commands/              ← 4 slash commands
+    ├── settings.json              ← Hook config
+    ├── hooks/
+    │   ├── pre_tool_use.py        ← Security + dangerous op blocking
+    │   ├── post_tool_use.py       ← Progress + elegance triggers
+    │   ├── secret-scanner.mjs     ← Secret detection
+    │   ├── gate-phase.mjs         ← Phase ordering
+    │   ├── block-dangerous.mjs    ← Destructive command blocking
+    │   ├── session-start.mjs      ← Context restore on start
+    │   ├── pre-compact.mjs        ← Backup before compaction
+    │   └── verify-completion.mjs  ← Approval gate enforcement
+    ├── agents/                    ← 14 specialized agents
+    ├── skills/                    ← Phase-specific workflows
+    └── commands/                  ← Slash commands
 ```
+
+## Security Model
+
+1. **PreToolUse hooks** block dangerous operations deterministically
+2. **secret-scanner** catches API keys, passwords, private keys before write
+3. **security-auditor** (opus) runs full OWASP Top 10 before deploy
+4. **VETO is absolute** — only a human can override
+5. **lessons.md** captures security mistakes so they never repeat
 
 ## Credits
 
 Built on patterns from:
-- [obra/superpowers](https://github.com/obra/superpowers) — systematic debugging, verification-before-completion
-- [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) — hook patterns, rules concept
-- [disler/claude-code-hooks-mastery](https://github.com/disler/claude-code-hooks-mastery) — SessionStart/PreCompact patterns
-- [BehiSecc/vibesec](https://github.com/BehiSecc/awesome-claude-skills) — OWASP Top 10 skill, secret scanning
+- [obra/superpowers](https://github.com/obra/superpowers) — systematic debugging, verification
+- [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) — hook patterns
+- [disler/claude-code-hooks-mastery](https://github.com/disler/claude-code-hooks-mastery) — SessionStart/PreCompact
+- [BehiSecc/vibesec](https://github.com/BehiSecc/awesome-claude-skills) — OWASP Top 10, secret scanning
 
 ## License
 

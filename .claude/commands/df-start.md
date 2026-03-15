@@ -1,57 +1,90 @@
-# /df:start
+# /df:start — Dark Factory Pipeline Start
+# Usage: /df:start
+# Trigger: User types /df:start to begin a new project pipeline
 
-Startet die Dark Factory Studio Pipeline für ein neues Projekt.
+You are now running the Dark Factory v6.1 autonomous pipeline.
+Execute the following sequence completely without stopping for confirmation.
 
-## Was dieser Command tut
+## Startup Sequence
 
-1. Liest alle vorhandenen Inputs (Prompt, Projektname, Actors, Constraints)
-2. Erstellt `studio/` Verzeichnis falls nicht vorhanden
-3. Initialisiert `studio/task_plan.md` mit Phase 01 als aktiv
-4. Spawnt den `prd-agent` für Phase 01
+### Step 0: State Files Check
+Read all 5 state files in this exact order:
+1. `tasks/lessons.md` — **Study every lesson. Apply them now.**
+2. `project-context.md` — Read the stack and agent routing
+3. `tasks/task_plan.md` — Check current phase
+4. `tasks/progress.md` — Check what's already done
+5. `tasks/findings.md` — Check for blockers
 
-## Vorbereitung
+If `project-context.md` is still a template (contains `[PROJECT_NAME]`):
+→ Run the detect-stack skill first to populate it from requirements.md
 
-Bevor du `/df:start` ausführst, stelle sicher dass du bereit bist zu beschreiben:
-- Was die App tun soll (Freiform)
-- Wer sie benutzt (Actors)
-- Was sie NICHT darf oder kosten soll (Constraints)
+### Step 1: Requirements Intake
+Read `requirements.md`. If it doesn't exist, ask the user for requirements and write them to `requirements.md`.
 
-## Ausführung
+### Step 2: Brainstorm & Architecture Select
+Spawn a subagent to:
+- Analyze requirements
+- Identify architecture pattern (use `.claude/patterns/INDEX.md`)
+- Populate `project-context.md` with confirmed stack
+- Write key decisions to `tasks/findings.md`
 
-```
-mkdir -p studio
-```
+### Step 3: Spec Writing
+Using the spec-writing skill, transform requirements into `SPEC.md`:
+- Functional requirements
+- Data models + PII field identification
+- User stories
+- Acceptance criteria per feature
+- Out of scope (explicit)
 
-Dann: Lade `.claude/skills/prd-interviewer/SKILL.md` und `.claude/skills/prd-interviewer/PHASE.md`.
+### Step 4: Architecture Design
+Using `ARCHITECTURE.md` template from `.claude/patterns/`:
+- Tech stack table with rationale
+- Database schema (Prisma or equivalent)
+- Auth architecture
+- Security decisions
+- Folder structure
+- Environment variables list
 
-Führe den PRD-Interview-Prozess durch. Stelle Fragen, bis alle Pflichtfelder gefüllt sind.
-Schreibe `studio/spec.md` und `studio/task_plan.md`.
-Warte auf `/df:approve`.
+### Step 5: Task Planning
+Write `tasks/task_plan.md`:
+- Break ARCHITECTURE.md into concrete tasks
+- Ordered by dependency
+- Each task has clear done-criteria
 
-## task_plan.md Template
+### Step 6: Implementation
+Route to correct agents from `project-context.md`:
+- `code_agent_frontend` for UI
+- `code_agent_backend` for API
+- TDD enforced: test first, then implement
 
-```markdown
-# Dark Factory Studio — Task Plan
+### Step 7: Architecture Review
+Dispatch `architect-reviewer` agent:
+- Reads `ARCHITECTURE.md` + implementation
+- Elegance check on all non-trivial code
+- Outputs `ARCHITECTURE_REVIEW.md`
+- CHANGES_REQUIRED → back to Step 6
+- APPROVED → continue
 
-project: [Name]
-started: [ISO date]
+### Step 8: Security Audit
+Dispatch `security-auditor` agent:
+- Full OWASP checklist
+- Outputs `SECURITY_REPORT.md`
+- VETO → pipeline halts, report shown to user
+- APPROVED → continue
 
-## Phases
+### Step 9: Deploy
+Dispatch `devops-agent`:
+- Build Docker image
+- Run CI checks
+- Deploy to target from `project-context.md`
+- Verify health check passes
 
-- [ ] phase_01: Prompt & PRD — status: active
-- [ ] phase_02: Design Review — status: locked
-- [ ] phase_03: Datenmodell — status: locked
-- [ ] phase_04: Stack Review — status: locked
-- [ ] phase_05: Build — status: locked
+### Step 10: Done
+- Update `tasks/progress.md` (final entry)
+- Summarize: what was built, where it's deployed, known limitations
+- Check `tasks/lessons.md` — any new lessons from this run?
 
-## Current Phase: 01
+---
 
-current_phase: 1
-current_status: in_progress
-
-## Open Tasks
-
-- [ ] Complete PRD interview
-- [ ] Write studio/spec.md
-- [ ] Await human approval
-```
+**No checkpoints. No confirmation prompts. Run autonomously from start to finish.**
+Only halt if: security VETO, missing requirements, or unresolvable technical blocker.
